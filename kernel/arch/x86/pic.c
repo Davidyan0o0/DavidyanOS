@@ -1,11 +1,6 @@
 #include "pic.h"
 
 
-void outb(
-    unsigned short port,
-    unsigned char data
-);
-
 void pic_init()
 {
 
@@ -21,11 +16,11 @@ void pic_init()
 
 
 
-    // 开启IRQ1
+    // 开启IRQ0和IRQ1
 
     outb(
         0x21,
-        0xfd
+        0xfc
     );
 
 }

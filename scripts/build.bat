@@ -72,6 +72,15 @@ nasm kernel/arch/x86/irq.asm -f elf32 -o out/irq.o
 if errorlevel 1 goto error
 
 
+echo.
+echo [3] Build isr
+
+
+nasm kernel/arch/x86/isr.asm -f elf32 -o out/isr.o
+
+if errorlevel 1 goto error
+
+
 
 echo.
 echo [4] Compile kernel.c
@@ -179,7 +188,58 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-6] Compile shell.c
+echo [5-6] Compile exception.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/arch/x86/exception.c ^
+-o out/exception.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-7] Compile timer.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/arch/x86/timer.c ^
+-o out/timer.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-8] Compile string.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/lib/string.c ^
+-o out/string.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-9] Compile shell.c
 
 
 %CC% ^
@@ -196,7 +256,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-7] Compile keyboard.c
+echo [5-10] Compile keyboard.c
 
 
 %CC% ^
@@ -220,9 +280,13 @@ echo [6] Link kernel
 -T linker.ld ^
 -o out/kernel.elf ^
 out/kernel_entry.o ^
+out/isr.o ^
 out/kernel.o ^
 out/system.o ^
 out/shell.o ^
+out/string.o ^
+out/exception.o ^
+out/timer.o ^
 out/vga.o ^
 out/console.o ^
 out/idt.o ^
@@ -302,6 +366,8 @@ echo Build Success
 echo ==========================
 echo Use scripts\run.bat to start QEMU.
 
+pause
+
 goto end
 
 
@@ -313,6 +379,8 @@ echo.
 echo ==========================
 echo Build Failed
 echo ==========================
+
+pause
 
 exit /b 1
 

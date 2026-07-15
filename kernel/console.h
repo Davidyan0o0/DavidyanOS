@@ -8,5 +8,7 @@ void print(char* str);
 
 void println(char* str);
 
+void print_uint(unsigned int value);
+
 
 #endif

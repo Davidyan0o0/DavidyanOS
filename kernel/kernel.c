@@ -3,6 +3,7 @@
 #include "kernel/shell.h"
 #include "kernel/arch/x86/pic.h"
 #include "kernel/arch/x86/idt.h"
+#include "kernel/arch/x86/timer.h"
 
 void kernel_main()
 {
@@ -34,6 +35,8 @@ void kernel_main()
 
 
     idt_init();
+
+    timer_init();
 
     shell_init();
 

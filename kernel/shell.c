@@ -2,6 +2,8 @@
 
 #include "kernel/console.h"
 #include "kernel/system.h"
+#include "kernel/lib/string.h"
+#include "kernel/arch/x86/timer.h"
 #include "drivers/video/vga.h"
 
 
@@ -10,58 +12,6 @@
 
 static char input_buffer[SHELL_INPUT_MAX];
 static int input_length = 0;
-
-
-static int string_equals(char* left,char* right)
-{
-
-    while(*left && *right)
-    {
-
-        if(*left!=*right)
-        {
-
-            return 0;
-
-        }
-
-
-        left++;
-        right++;
-
-    }
-
-
-    return *left==0 && *right==0;
-
-}
-
-
-
-static int string_starts_with(char* text,char* prefix)
-{
-
-    while(*prefix)
-    {
-
-        if(*text!=*prefix)
-        {
-
-            return 0;
-
-        }
-
-
-        text++;
-        prefix++;
-
-    }
-
-
-    return 1;
-
-}
-
 
 
 static void shell_prompt()
@@ -86,7 +36,7 @@ static void shell_reset_input()
 static void shell_execute(char* command)
 {
 
-    if(string_equals(command,""))
+    if(strcmp(command,"")==0)
     {
 
         return;
@@ -94,16 +44,16 @@ static void shell_execute(char* command)
     }
 
 
-    if(string_equals(command,"help"))
+    if(strcmp(command,"help")==0)
     {
 
-        println("Commands: help, clear, info, echo");
+        println("Commands: help, clear, info, uptime, echo");
         return;
 
     }
 
 
-    if(string_equals(command,"clear"))
+    if(strcmp(command,"clear")==0)
     {
 
         vga_clear();
@@ -112,7 +62,7 @@ static void shell_execute(char* command)
     }
 
 
-    if(string_equals(command,"info"))
+    if(strcmp(command,"info")==0)
     {
 
         system_print_info();
@@ -121,7 +71,20 @@ static void shell_execute(char* command)
     }
 
 
-    if(string_starts_with(command,"echo "))
+    if(strcmp(command,"uptime")==0)
+    {
+
+        print("Uptime: ");
+        print_uint(timer_get_seconds());
+        print("s (");
+        print_uint(timer_get_ticks());
+        println(" ticks)");
+        return;
+
+    }
+
+
+    if(strncmp(command,"echo ",5)==0)
     {
 
         println(command+5);

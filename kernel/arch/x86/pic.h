@@ -4,5 +4,7 @@
 
 void pic_init();
 
+void outb(unsigned short port,unsigned char data);
+
 
 #endif
