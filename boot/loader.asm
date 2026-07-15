@@ -2,15 +2,27 @@
 
 org 0x8000
 
+dw 0xDADA
 
 start:
 
 
     cli
+    cld
 
     xor ax,ax
     mov ds,ax
+    mov es,ax
     mov [BOOT_DRIVE],dl
+
+    sti
+
+    mov al,'2'
+    call print_char
+
+    xor ax,ax
+    mov dl,[BOOT_DRIVE]
+    int 0x13
 
 
 ; ------------------
@@ -65,6 +77,8 @@ print:
 enter_pm:
 
 
+    cli
+
     lgdt [gdt_descriptor]
 
 
@@ -106,6 +120,11 @@ disk_error:
     int 0x10
 
     jmp .err
+
+print_char:
+    mov ah,0x0e
+    int 0x10
+    ret
 
 
 

@@ -5,6 +5,7 @@ org 0x7c00 ;RAM address
 start:
 
     cli ; 关闭中断
+    cld
 
     ;初始化寄存器
     xor ax,ax
@@ -18,28 +19,47 @@ start:
     mov cx,ax
     mov dx,ax
 
-    ;磁盘功能
-    ;mov ah,0x02         ; 读取扇区(BIOS 功能)
-    ;mov al,4            ; 读取4个扇区(BIOS 参数)
-    ;mov ch,0            ; 柱面号
-    ;mov cl,2            ; 扇区号
-    ;mov dh,0            ; 磁头号
-    ;mov dl,[BOOT_DRIVE] ; 硬盘驱动器号
-    ;mov dl,0x80
-    ;mov bx,0x8000       ; 加载到RAM地址
+    sti
 
+    mov al,'B'
+    call print_char
 
-    ; LBA读取
-    mov si,DAP
-    mov ah,0x42          ; 扩展读取
+    xor ax,ax
     mov dl,[BOOT_DRIVE]
+    int 0x13
+
+    mov si,DAP
+    mov ah,0x42          ; 优先使用扩展LBA读取
+    mov dl,[BOOT_DRIVE]
+    int 0x13
+    jnc check_loader
+
+    xor ax,ax
+    mov dl,[BOOT_DRIVE]
+    int 0x13
+
+chs_read:
+    mov ah,0x02          ; 读取扇区(BIOS CHS)
+    mov al,4             ; 读取4个扇区
+    mov ch,0             ; 柱面号
+    mov cl,2             ; 扇区号
+    mov dh,0             ; 磁头号
+    mov dl,[BOOT_DRIVE]
+    mov bx,0x8000        ; 加载到RAM地址
 
     int 0x13             ; BIOS 磁盘中断
 
     jc disk_error
 
+check_loader:
+    cmp word [0x8000],0xDADA
+    jne loader_signature_error
+
+    mov al,'L'
+    call print_char
+
     mov dl,[BOOT_DRIVE]
-    jmp 0x0000:0x8000
+    jmp 0x0000:0x8002
 
 
 disk_error:
@@ -51,6 +71,23 @@ disk_error:
         mov ah,0x0e ; 设置 BIOS 视频服务功能号
         int 0x10    ; 显示中断
         jmp .print
+
+loader_signature_error:
+    mov si,sig_msg
+    .print:
+        lodsb
+        cmp al,0
+        je $
+        mov ah,0x0e
+        int 0x10
+        jmp .print
+
+print_char:
+    mov ah,0x0e
+    int 0x10
+    ret
+
+align 4
 
 ; Disk Address Packet
 DAP:
@@ -67,6 +104,9 @@ DAP:
 
 msg:
     db "Loader Load Error",0
+
+sig_msg:
+    db "Bad Loader",0
 
 BOOT_DRIVE:
     db 0
