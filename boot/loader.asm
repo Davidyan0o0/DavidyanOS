@@ -8,32 +8,21 @@ start:
 
     cli
 
+    xor ax,ax
+    mov ds,ax
+    mov [BOOT_DRIVE],dl
+
 
 ; ------------------
 ; 加载Kernel
 ; ------------------
 
 
-    mov ah,0x02
+    mov si,KERNEL_DAP
 
-    mov al,10        ; kernel大小10扇区
+    mov ah,0x42
 
-    mov ch,0
-
-    mov cl,6         ; 第6扇区开始
-
-
-    mov dh,0
-
-    mov dl,0x80
-
-
-
-    mov bx,0x1000
-
-    mov es,bx
-
-    xor bx,bx
+    mov dl,[BOOT_DRIVE]
 
 
 
@@ -89,7 +78,16 @@ enter_pm:
 
     jmp 0x08:protected
 
+BOOT_DRIVE:
+    db 0
 
+KERNEL_DAP:
+    db 0x10
+    db 0x00
+    dw 32          ; kernel最大读取32扇区
+    dw 0x0000
+    dw 0x1000
+    dq 5           ; kernel从磁盘第5个LBA扇区开始
 
 disk_error:
 

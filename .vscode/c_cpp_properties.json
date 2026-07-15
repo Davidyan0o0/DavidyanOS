@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "DavidyanOS",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "__KERNEL__"
+            ],
+            "windowsSdkVersion": "10.0.20348.0",
+            "compilerPath": "i686-elf-gcc",
+            "cStandard": "gnu11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-x86"
+        }
+    ],
+    "version": 4
+}

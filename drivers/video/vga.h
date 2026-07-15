@@ -8,6 +8,8 @@ void vga_clear();
 
 void vga_put_char(char c);
 
+void vga_backspace();
+
 void vga_write(char* str);
 
 
