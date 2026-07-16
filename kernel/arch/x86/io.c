@@ -34,6 +34,66 @@ void outb(unsigned short port,unsigned char data)
 
 
 
+unsigned short inw(unsigned short port)
+{
+
+    unsigned short ret;
+
+
+    asm volatile(
+        "inw %1,%0"
+        :"=a"(ret)
+        :"Nd"(port)
+    );
+
+
+    return ret;
+
+}
+
+
+
+void outw(unsigned short port,unsigned short data)
+{
+
+    asm volatile(
+        "outw %0,%1"
+        :
+        :"a"(data),
+        "Nd"(port))
+    ;
+
+}
+
+
+
+void insw(unsigned short port,void* addr,int count)
+{
+
+    asm volatile(
+        "cld; rep insw"
+        :"+D"(addr),"+c"(count)
+        :"d"(port)
+        :"memory"
+    );
+
+}
+
+
+
+void outsw(unsigned short port,void* addr,int count)
+{
+
+    asm volatile(
+        "cld; rep outsw"
+        :"+S"(addr),"+c"(count)
+        :"d"(port)
+    );
+
+}
+
+
+
 void io_wait()
 {
 

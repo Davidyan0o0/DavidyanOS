@@ -66,6 +66,7 @@ void ramfs_init()
     ramfs_create("net.cfg","ip=10.0.2.15 gateway=10.0.2.2 dns=10.0.2.3");
     ramfs_create("notes.txt","This filesystem lives in kernel memory.");
     ramfs_create("/log/boot.log","console vga pic idt timer heap fs net ready");
+    ramfs_create("logo.ppm","P3 2 2 255 255 0 0 0 255 0 0 0 255 255 255 255 255");
 }
 
 RAMFS_NODE* ramfs_find(char* name)
@@ -182,6 +183,39 @@ int ramfs_append(char* name,char* data)
     }
 
     ramfs_append_data(node,data);
+    return 1;
+}
+
+int ramfs_read(char* name,char* out,unsigned int capacity)
+{
+    RAMFS_NODE* node = ramfs_find(name);
+    unsigned int i;
+
+    if(node==0 || node->directory || capacity==0)
+    {
+        return 0;
+    }
+
+    for(i=0;i<node->size && i<capacity-1;i++)
+    {
+        out[i] = node->data[i];
+    }
+
+    out[i] = 0;
+    return 1;
+}
+
+int ramfs_stat(char* name,unsigned int* size,unsigned int* directory)
+{
+    RAMFS_NODE* node = ramfs_find(name);
+
+    if(node==0)
+    {
+        return 0;
+    }
+
+    *size = node->size;
+    *directory = node->directory;
     return 1;
 }
 

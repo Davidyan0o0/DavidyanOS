@@ -111,7 +111,27 @@ unsigned char shift_keymap[128]=
 
 
 
-static int shift_pressed = 0;
+static int left_shift_pressed = 0;
+static int right_shift_pressed = 0;
+static int caps_lock_enabled = 0;
+
+
+
+static int is_letter(char c)
+{
+
+return c>='a' && c<='z';
+
+}
+
+
+
+static char to_upper(char c)
+{
+
+return c-'a'+'A';
+
+}
 
 
 
@@ -137,10 +157,33 @@ released = scancode & 0x80;
 scancode = scancode & 0x7F;
 
 
-if(scancode==42 || scancode==54)
+if(scancode==42)
 {
 
-shift_pressed = released ? 0 : 1;
+left_shift_pressed = released ? 0 : 1;
+return;
+
+}
+
+
+if(scancode==54)
+{
+
+right_shift_pressed = released ? 0 : 1;
+return;
+
+}
+
+
+if(scancode==58)
+{
+
+if(!released)
+{
+
+caps_lock_enabled = !caps_lock_enabled;
+
+}
 return;
 
 }
@@ -156,9 +199,23 @@ return;
 
 
 
-c = shift_pressed ?
-shift_keymap[scancode] :
-keymap[scancode];
+c = keymap[scancode];
+
+
+if(left_shift_pressed || right_shift_pressed)
+{
+
+c = shift_keymap[scancode];
+
+}
+
+
+if(is_letter(keymap[scancode]) && caps_lock_enabled)
+{
+
+c = (left_shift_pressed || right_shift_pressed) ? keymap[scancode] : to_upper(keymap[scancode]);
+
+}
 
 
 

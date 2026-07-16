@@ -65,7 +65,7 @@ BOOT_DRIVE:
 KERNEL_DAP:
     db 0x10
     db 0x00
-    dw 64          ; kernel最大读取64扇区
+    dw 96          ; kernel最大读取96扇区
     dw 0x0000
     dw 0x1000
     dq 5           ; kernel从磁盘第5个LBA扇区开始

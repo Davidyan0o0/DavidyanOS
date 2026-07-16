@@ -20,6 +20,8 @@ int ramfs_mkdir(char* name);
 int ramfs_touch(char* name);
 int ramfs_write(char* name,char* data);
 int ramfs_append(char* name,char* data);
+int ramfs_read(char* name,char* out,unsigned int capacity);
+int ramfs_stat(char* name,unsigned int* size,unsigned int* directory);
 int ramfs_rename(char* old_name,char* new_name);
 int ramfs_delete(char* name);
 RAMFS_NODE* ramfs_find(char* name);

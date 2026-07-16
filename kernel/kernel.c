@@ -9,6 +9,9 @@
 #include "kernel/net/net.h"
 #include "kernel/device/device.h"
 #include "drivers/storage/ramdisk.h"
+#include "kernel/graphics/image.h"
+#include "drivers/storage/ata.h"
+#include "kernel/fs/diskfs.h"
 
 void kernel_main()
 {
@@ -49,13 +52,21 @@ void kernel_main()
 
     ramdisk_init();
 
+    ata_init();
+
     device_register("rd0","block");
+
+    device_register("hd0","ata");
 
     device_register("net0","network");
 
     ramfs_init();
 
+    diskfs_init();
+
     net_init();
+
+    image_init();
 
     shell_init();
 

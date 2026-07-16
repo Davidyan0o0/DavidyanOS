@@ -1,0 +1,7 @@
+ramfs
+touch <file>          创建空文件
+write <file> <text>   创建或覆盖文件内容
+append <file> <text>  追加内容
+cat <file>            查看文件
+rm <file>             删除文件
+ls                    列出文件

@@ -55,7 +55,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [3] Build kernel entry
+echo [3-1] Build kernel entry
 
 
 nasm kernel/arch/x86/kernel_entry.asm -f elf32 -o out/kernel_entry.o
@@ -64,7 +64,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [3] Build irq
+echo [3-2] Build irq
 
 
 nasm kernel/arch/x86/irq.asm -f elf32 -o out/irq.o
@@ -73,7 +73,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [3] Build isr
+echo [3-3] Build isr
 
 
 nasm kernel/arch/x86/isr.asm -f elf32 -o out/isr.o
@@ -290,7 +290,75 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-12] Compile device.c
+echo [5-12] Compile ata.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c drivers/storage/ata.c ^
+-o out/ata.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-13] Compile diskfs.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/fs/diskfs.c ^
+-o out/diskfs.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-14] Compile ne2k.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c drivers/net/ne2k.c ^
+-o out/ne2k.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-15] Compile image.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/graphics/image.c ^
+-o out/image.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-16] Compile device.c
 
 
 %CC% ^
@@ -307,7 +375,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-13] Compile ramdisk.c
+echo [5-17] Compile ramdisk.c
 
 
 %CC% ^
@@ -324,7 +392,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-14] Compile ramfs.c
+echo [5-18] Compile ramfs.c
 
 
 %CC% ^
@@ -341,7 +409,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-15] Compile net.c
+echo [5-19] Compile net.c
 
 
 %CC% ^
@@ -359,7 +427,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-16] Compile shell.c
+echo [5-20] Compile shell.c
 
 
 %CC% ^
@@ -376,7 +444,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-17] Compile heap.c
+echo [5-21] Compile heap.c
 
 
 %CC% ^
@@ -393,7 +461,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-18] Compile keyboard.c
+echo [5-22] Compile keyboard.c
 
 
 %CC% ^
@@ -421,6 +489,10 @@ out/isr.o ^
 out/kernel.o ^
 out/system.o ^
 out/shell.o ^
+out/ata.o ^
+out/diskfs.o ^
+out/ne2k.o ^
+out/image.o ^
 out/device.o ^
 out/ramdisk.o ^
 out/ramfs.o ^

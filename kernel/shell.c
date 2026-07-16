@@ -12,6 +12,10 @@
 #include "kernel/device/device.h"
 #include "drivers/video/vga.h"
 #include "drivers/storage/ramdisk.h"
+#include "kernel/graphics/image.h"
+#include "drivers/storage/ata.h"
+#include "kernel/fs/diskfs.h"
+#include "drivers/net/ne2k.h"
 
 
 #define SHELL_INPUT_MAX 128
@@ -19,6 +23,10 @@
 
 static char input_buffer[SHELL_INPUT_MAX];
 static int input_length = 0;
+static char disk_edit_name[DISKFS_NAME_MAX];
+static char disk_edit_buffer[DISKFS_DATA_MAX];
+static unsigned int disk_edit_open = 0;
+static unsigned int disk_edit_dirty = 0;
 
 
 static void shell_prompt()
@@ -84,6 +92,60 @@ static char* shell_skip_word(char* text)
 
 
 
+static void shell_copy_text(char* dest,char* src,unsigned int capacity)
+{
+
+    unsigned int i;
+
+    if(capacity==0)
+    {
+
+        return;
+
+    }
+
+    for(i=0;i<capacity-1 && src[i];i++)
+    {
+
+        dest[i] = src[i];
+
+    }
+
+    dest[i] = 0;
+
+}
+
+
+
+static unsigned int shell_append_text(char* dest,char* src,unsigned int capacity)
+{
+
+    unsigned int length = (unsigned int)strlen(dest);
+    unsigned int i = 0;
+
+    if(capacity==0)
+    {
+
+        return 0;
+
+    }
+
+    while(length<capacity-1 && src[i])
+    {
+
+        dest[length] = src[i];
+        length++;
+        i++;
+
+    }
+
+    dest[length] = 0;
+    return i;
+
+}
+
+
+
 static int shell_split_two(char* text,char** first,char** second)
 {
 
@@ -137,10 +199,16 @@ static void shell_print_help()
     println("  help, clear, info, uptime, ticks");
     println("  time, date, mem, alloc <bytes>");
     println("  devs, disk, disk read <n>, disk write <n> <text>");
+    println("  ata, dfs, dfs write/cat/rm/format <file>");
+    println("  dfs open/view/edit/append/save/status for disk files");
     println("  ls, mkdir <dir>, touch <file>, cat/write/append/rm/mv");
     println("  color <fg> <bg>, box, rect, theme");
+    println("  img <file> [scale], imginfo <file>, demoimg");
     println("  net, ip <addr>, route <gw>, arp, arp add <ip> <mac>");
+    println("  dns <name>, dhcp, sockets, listen/close <port>");
     println("  link <up|down>, ping <ip>, send <ip> <text>, rx <text>");
+    println("  netsend <text> sends a real NE2000 ethernet frame");
+    println("  arpreq <ip>, udp <ip> <port> <text>");
     println("  echo <text>, reboot, halt");
 
 }
@@ -236,6 +304,241 @@ static void shell_print_disk()
 
 
 
+static void shell_print_diskfs()
+{
+
+    unsigned int i;
+    DISKFS_ENTRY* entry;
+
+    print("diskfs mounted=");
+    println(diskfs_mounted() ? "yes" : "no");
+    for(i=0;i<diskfs_count();i++)
+    {
+        entry = diskfs_get(i);
+        if(entry)
+        {
+            print(entry->name);
+            print("  ");
+            print_uint(entry->size);
+            println(" bytes");
+        }
+    }
+
+}
+
+
+
+static void shell_print_diskfs_error()
+{
+
+    unsigned int error = diskfs_last_error();
+
+    if(error==DISKFS_ERROR_NOT_MOUNTED)
+    {
+
+        print("diskfs not mounted");
+
+    }
+    else if(error==DISKFS_ERROR_BAD_NAME)
+    {
+
+        print("bad file name");
+
+    }
+    else if(error==DISKFS_ERROR_NO_SPACE)
+    {
+
+        print("no free disk file slots");
+
+    }
+    else if(error==DISKFS_ERROR_DATA_WRITE)
+    {
+
+        print("data sector write failed");
+
+    }
+    else if(error==DISKFS_ERROR_SUPER_WRITE)
+    {
+
+        print("directory sector write failed");
+
+    }
+    else if(error==DISKFS_ERROR_DATA_READ)
+    {
+
+        print("data sector read failed");
+
+    }
+    else
+    {
+
+        print("unknown diskfs error");
+
+    }
+
+    print(" ata=");
+    print_hex(ata_last_status());
+    println("");
+
+}
+
+
+
+static void shell_disk_edit_status()
+{
+
+    if(!disk_edit_open)
+    {
+
+        println("No disk file open");
+        return;
+
+    }
+
+    print("Open: ");
+    print(disk_edit_name);
+    print(" size=");
+    print_uint((unsigned int)strlen(disk_edit_buffer));
+    print(" dirty=");
+    println(disk_edit_dirty ? "yes" : "no");
+
+}
+
+
+
+static void shell_disk_edit_open(char* name)
+{
+
+    if(name[0]==0)
+    {
+
+        println("Usage: dfs open <file>");
+        return;
+
+    }
+
+    shell_copy_text(disk_edit_name,name,DISKFS_NAME_MAX);
+    if(!diskfs_read(name,disk_edit_buffer,DISKFS_DATA_MAX))
+    {
+
+        disk_edit_buffer[0] = 0;
+        println("New disk edit buffer");
+
+    }
+    else
+    {
+
+        println("Disk file loaded");
+
+    }
+
+    disk_edit_open = 1;
+    disk_edit_dirty = 0;
+
+}
+
+
+
+static void shell_disk_edit_view(char* name)
+{
+
+    char data[DISKFS_DATA_MAX];
+
+    if(name[0]!=0)
+    {
+
+        if(!diskfs_read(name,data,DISKFS_DATA_MAX))
+        {
+
+            println("disk file not found");
+            return;
+
+        }
+
+        println(data);
+        return;
+
+    }
+
+    if(!disk_edit_open)
+    {
+
+        println("Usage: dfs view [file]");
+        return;
+
+    }
+
+    println(disk_edit_buffer);
+
+}
+
+
+
+static void shell_disk_edit_replace(char* data)
+{
+
+    if(!disk_edit_open)
+    {
+
+        println("Use dfs open <file> first");
+        return;
+
+    }
+
+    shell_copy_text(disk_edit_buffer,data,DISKFS_DATA_MAX);
+    disk_edit_dirty = 1;
+    println("Disk edit buffer updated");
+
+}
+
+
+
+static void shell_disk_edit_append(char* data)
+{
+
+    if(!disk_edit_open)
+    {
+
+        println("Use dfs open <file> first");
+        return;
+
+    }
+
+    shell_append_text(disk_edit_buffer,data,DISKFS_DATA_MAX);
+    disk_edit_dirty = 1;
+    println("Disk edit buffer appended");
+
+}
+
+
+
+static void shell_disk_edit_save()
+{
+
+    if(!disk_edit_open)
+    {
+
+        println("Use dfs open <file> first");
+        return;
+
+    }
+
+    if(!diskfs_write(disk_edit_name,disk_edit_buffer))
+    {
+
+        print("disk save failed: ");
+        shell_print_diskfs_error();
+        return;
+
+    }
+
+    disk_edit_dirty = 0;
+    println("Disk file saved");
+
+}
+
+
+
 static void shell_print_arp()
 {
 
@@ -269,6 +572,22 @@ static void shell_print_net()
     print(dev->name);
     print(" link=");
     println(dev->link_up ? "up" : "down");
+    print("hardware=");
+    println(dev->hardware ? "ne2k" : "none");
+    if(dev->hardware)
+    {
+        unsigned int i;
+        print("mac=");
+        for(i=0;i<6;i++)
+        {
+            if(i>0)
+            {
+                print(":");
+            }
+            print_hex(dev->mac[i]);
+        }
+        println("");
+    }
     print("ip=");
     net_print_ip(dev->ip);
     print(" gateway=");
@@ -278,6 +597,8 @@ static void shell_print_net()
     println("");
     print("tx=");
     print_uint(dev->tx_packets);
+    print(" hwtx=");
+    print_uint(ne2k_tx_count());
     print(" rx=");
     print_uint(dev->rx_packets);
     print(" drop=");
@@ -457,6 +778,153 @@ static void shell_execute(char* command)
     {
 
         shell_print_disk();
+        return;
+
+    }
+
+
+    if(strcmp(command,"ata")==0)
+    {
+
+        print("ATA status=");
+        print_hex(ata_last_status());
+        print(" identify=");
+        println(ata_identify() ? "ok" : "fail");
+        return;
+
+    }
+
+
+    if(strcmp(command,"dfs")==0)
+    {
+
+        shell_print_diskfs();
+        return;
+
+    }
+
+
+    if(strcmp(command,"dfs format")==0)
+    {
+
+        if(!diskfs_format())
+        {
+
+            print("format failed: ");
+            shell_print_diskfs_error();
+            return;
+
+        }
+        println("diskfs formatted");
+        disk_edit_open = 0;
+        disk_edit_dirty = 0;
+        disk_edit_name[0] = 0;
+        disk_edit_buffer[0] = 0;
+        return;
+
+    }
+
+
+    if(strcmp(command,"dfs status")==0)
+    {
+
+        shell_disk_edit_status();
+        return;
+
+    }
+
+
+    if(strncmp(command,"dfs open ",9)==0)
+    {
+
+        shell_disk_edit_open(command+9);
+        return;
+
+    }
+
+
+    if(strcmp(command,"dfs view")==0)
+    {
+
+        shell_disk_edit_view("");
+        return;
+
+    }
+
+
+    if(strncmp(command,"dfs view ",9)==0)
+    {
+
+        shell_disk_edit_view(command+9);
+        return;
+
+    }
+
+
+    if(strncmp(command,"dfs edit ",9)==0)
+    {
+
+        shell_disk_edit_replace(command+9);
+        return;
+
+    }
+
+
+    if(strncmp(command,"dfs append ",11)==0)
+    {
+
+        shell_disk_edit_append(command+11);
+        return;
+
+    }
+
+
+    if(strcmp(command,"dfs save")==0)
+    {
+
+        shell_disk_edit_save();
+        return;
+
+    }
+
+
+    if(strncmp(command,"dfs write ",10)==0)
+    {
+
+        char* name = command+10;
+        char* data = shell_skip_word(name);
+
+        if(data[0]==0)
+        {
+            println("Usage: dfs write <file> <text>");
+            return;
+        }
+        *(data-1) = 0;
+        println(diskfs_write(name,data) ? "disk file written" : "disk write failed");
+        return;
+
+    }
+
+
+    if(strncmp(command,"dfs cat ",8)==0)
+    {
+
+        char data[DISKFS_DATA_MAX];
+        if(!diskfs_read(command+8,data,DISKFS_DATA_MAX))
+        {
+            println("disk file not found");
+            return;
+        }
+        println(data);
+        return;
+
+    }
+
+
+    if(strncmp(command,"dfs rm ",7)==0)
+    {
+
+        println(diskfs_delete(command+7) ? "disk file deleted" : "disk file not found");
         return;
 
     }
@@ -682,10 +1150,136 @@ static void shell_execute(char* command)
     }
 
 
+    if(strncmp(command,"imginfo ",8)==0)
+    {
+
+        IMAGE image;
+        if(!image_load_file(command+8,&image))
+        {
+            println("Image load failed (use P3 PPM)");
+            return;
+        }
+
+        image_print_info(&image);
+        return;
+
+    }
+
+
+    if(strncmp(command,"img ",4)==0)
+    {
+
+        IMAGE image;
+        char* file = command+4;
+        char* scale_text = shell_skip_word(file);
+        int scale = 1;
+
+        if(scale_text[0]!=0)
+        {
+            *(scale_text-1) = 0;
+            scale = (int)shell_parse_uint(scale_text);
+        }
+
+        if(!image_load_file(file,&image))
+        {
+            println("Image load failed (use P3 PPM)");
+            return;
+        }
+
+        vga_clear();
+        image_display(&image,2,2,scale);
+        return;
+
+    }
+
+
+    if(strcmp(command,"demoimg")==0)
+    {
+
+        IMAGE image;
+        image_make_demo(&image);
+        vga_clear();
+        image_display(&image,2,2,2);
+        return;
+
+    }
+
+
     if(strcmp(command,"net")==0)
     {
 
         shell_print_net();
+        return;
+
+    }
+
+
+    if(strcmp(command,"sockets")==0)
+    {
+
+        unsigned int i;
+        NET_SOCKET* socket;
+
+        for(i=0;i<net_socket_count();i++)
+        {
+            socket = net_get_socket(i);
+            if(socket)
+            {
+                print_uint(socket->port);
+                print("  ");
+                print(socket->protocol);
+                print("  ");
+                println(socket->state);
+            }
+        }
+
+        return;
+
+    }
+
+
+    if(strncmp(command,"listen ",7)==0)
+    {
+
+        unsigned int port = shell_parse_uint(command+7);
+        println(net_socket_open((unsigned short)port,"tcp") ? "Socket listening" : "Listen failed");
+        return;
+
+    }
+
+
+    if(strncmp(command,"close ",6)==0)
+    {
+
+        unsigned int port = shell_parse_uint(command+6);
+        println(net_socket_close((unsigned short)port) ? "Socket closed" : "Socket not found");
+        return;
+
+    }
+
+
+    if(strncmp(command,"dns ",4)==0)
+    {
+
+        IPV4_ADDR ip;
+        if(!net_dns_resolve(command+4,&ip))
+        {
+            println("DNS name not found");
+            return;
+        }
+
+        net_print_ip(ip);
+        println("");
+        return;
+
+    }
+
+
+    if(strcmp(command,"dhcp")==0)
+    {
+
+        net_dhcp_refresh();
+        println("DHCP lease refreshed");
         return;
 
     }
@@ -842,6 +1436,61 @@ static void shell_execute(char* command)
 
         }
 
+        return;
+
+    }
+
+
+    if(strncmp(command,"netsend ",8)==0)
+    {
+
+        println(net_send_raw_demo(command+8) ? "ethernet frame sent" : "hardware send failed");
+        return;
+
+    }
+
+
+    if(strncmp(command,"arpreq ",7)==0)
+    {
+
+        IPV4_ADDR ip;
+        if(!net_parse_ipv4(command+7,&ip))
+        {
+            println("Bad IPv4 address");
+            return;
+        }
+
+        println(net_send_arp_request(ip) ? "arp request sent" : "arp send failed");
+        return;
+
+    }
+
+
+    if(strncmp(command,"udp ",4)==0)
+    {
+
+        IPV4_ADDR ip;
+        char* address = command+4;
+        char* port_text = shell_skip_word(address);
+        char* payload = shell_skip_word(port_text);
+        unsigned int port;
+
+        if(port_text[0]==0 || payload[0]==0)
+        {
+            println("Usage: udp <ip> <port> <text>");
+            return;
+        }
+
+        *(port_text-1) = 0;
+        *(payload-1) = 0;
+        port = shell_parse_uint(port_text);
+        if(!net_parse_ipv4(address,&ip))
+        {
+            println("Bad IPv4 address");
+            return;
+        }
+
+        println(net_send_udp(ip,(unsigned short)port,payload) ? "udp packet sent" : "udp send failed");
         return;
 
     }
