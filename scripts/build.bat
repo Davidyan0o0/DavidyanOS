@@ -188,7 +188,24 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-6] Compile exception.c
+echo [5-6] Compile io.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/arch/x86/io.c ^
+-o out/io.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-7] Compile exception.c
 
 
 %CC% ^
@@ -205,7 +222,7 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-7] Compile timer.c
+echo [5-8] Compile timer.c
 
 
 %CC% ^
@@ -222,7 +239,41 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-8] Compile string.c
+echo [5-9] Compile rtc.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/arch/x86/rtc.c ^
+-o out/rtc.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-10] Compile power.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/arch/x86/power.c ^
+-o out/power.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-11] Compile string.c
 
 
 %CC% ^
@@ -239,7 +290,76 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-9] Compile shell.c
+echo [5-12] Compile device.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/device/device.c ^
+-o out/device.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-13] Compile ramdisk.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c drivers/storage/ramdisk.c ^
+-o out/ramdisk.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-14] Compile ramfs.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/fs/ramfs.c ^
+-o out/ramfs.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-15] Compile net.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/net/net.c ^
+-o out/net.o
+
+
+if errorlevel 1 goto error
+
+
+
+echo.
+echo [5-16] Compile shell.c
 
 
 %CC% ^
@@ -256,7 +376,24 @@ if errorlevel 1 goto error
 
 
 echo.
-echo [5-10] Compile keyboard.c
+echo [5-17] Compile heap.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c kernel/memory/heap.c ^
+-o out/heap.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-18] Compile keyboard.c
 
 
 %CC% ^
@@ -284,9 +421,17 @@ out/isr.o ^
 out/kernel.o ^
 out/system.o ^
 out/shell.o ^
+out/device.o ^
+out/ramdisk.o ^
+out/ramfs.o ^
+out/net.o ^
 out/string.o ^
+out/heap.o ^
+out/io.o ^
 out/exception.o ^
 out/timer.o ^
+out/rtc.o ^
+out/power.o ^
 out/vga.o ^
 out/console.o ^
 out/idt.o ^

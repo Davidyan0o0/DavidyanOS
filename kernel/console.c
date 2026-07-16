@@ -67,3 +67,23 @@ void print_uint(unsigned int value)
     }
 
 }
+
+
+
+void print_hex(unsigned int value)
+{
+
+    char* digits = "0123456789ABCDEF";
+    int shift;
+
+
+    print("0x");
+
+
+    for(shift=28;shift>=0;shift-=4)
+    {
+
+        vga_put_char(digits[(value>>shift)&0xF]);
+
+    }
+}

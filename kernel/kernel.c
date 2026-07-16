@@ -4,6 +4,11 @@
 #include "kernel/arch/x86/pic.h"
 #include "kernel/arch/x86/idt.h"
 #include "kernel/arch/x86/timer.h"
+#include "kernel/memory/heap.h"
+#include "kernel/fs/ramfs.h"
+#include "kernel/net/net.h"
+#include "kernel/device/device.h"
+#include "drivers/storage/ramdisk.h"
 
 void kernel_main()
 {
@@ -37,6 +42,20 @@ void kernel_main()
     idt_init();
 
     timer_init();
+
+    heap_init();
+
+    device_init();
+
+    ramdisk_init();
+
+    device_register("rd0","block");
+
+    device_register("net0","network");
+
+    ramfs_init();
+
+    net_init();
 
     shell_init();
 

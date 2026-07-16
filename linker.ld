@@ -41,4 +41,8 @@ SECTIONS
         *(.bss*)
     } :data
 
+
+    . = ALIGN(0x1000);
+    _kernel_end = .;
+
 }

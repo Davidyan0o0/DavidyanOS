@@ -1,5 +1,7 @@
 #include "pic.h"
 
+#include "kernel/arch/x86/io.h"
+
 
 void pic_init()
 {
@@ -25,14 +27,3 @@ void pic_init()
 
 }
 
-
-
-void outb(unsigned short port,unsigned char data)
-{
-    asm volatile(
-        "outb %0,%1"
-        :
-        :"a"(data),
-        "Nd"(port))
-    ;
-}

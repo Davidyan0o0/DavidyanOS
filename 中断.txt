@@ -1,0 +1,30 @@
+x86 中断主要分三类：
+
+         类型	                                           来源	     例子
+异常（Exception）	                     CPU 自动产生	除零、页错误
+硬件中断（Hardware Interrupt）        外部设备	键盘、定时器
+软件中断（Software Interrupt）	      程序主动触发	int 0x80
+
+Intel 保留 0~31号中断向量 给 CPU 异常
+
+硬件 IRQ 中断:
+IRQ	中断号	设备
+IRQ0	0x20	时钟
+IRQ1	0x21	键盘
+IRQ2	0x22	级联
+IRQ3	0x23	串口
+IRQ4	0x24	串口
+IRQ5	0x25	声卡
+IRQ6	0x26	软盘
+IRQ7	0x27	并口
+IRQ8	0x28	RTC
+IRQ9	0x29	ACPI
+IRQ10	0x2A	设备
+IRQ11	0x2B	设备
+IRQ12	0x2C	鼠标
+IRQ13	0x2D	FPU
+IRQ14	0x2E	硬盘
+IRQ15	0x2F	硬盘
+
+软件中断:
+程序主动调用

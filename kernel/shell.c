@@ -4,7 +4,14 @@
 #include "kernel/system.h"
 #include "kernel/lib/string.h"
 #include "kernel/arch/x86/timer.h"
+#include "kernel/arch/x86/rtc.h"
+#include "kernel/arch/x86/power.h"
+#include "kernel/memory/heap.h"
+#include "kernel/fs/ramfs.h"
+#include "kernel/net/net.h"
+#include "kernel/device/device.h"
 #include "drivers/video/vga.h"
+#include "drivers/storage/ramdisk.h"
 
 
 #define SHELL_INPUT_MAX 128
@@ -33,6 +40,313 @@ static void shell_reset_input()
 
 
 
+static unsigned int shell_parse_uint(char* text)
+{
+
+    unsigned int value = 0;
+
+
+    while(*text>='0' && *text<='9')
+    {
+
+        value = value*10 + (*text-'0');
+        text++;
+
+    }
+
+
+    return value;
+
+}
+
+
+
+static char* shell_skip_word(char* text)
+{
+
+    while(*text && *text!=' ')
+    {
+
+        text++;
+
+    }
+
+    while(*text==' ')
+    {
+
+        text++;
+
+    }
+
+    return text;
+
+}
+
+
+
+static int shell_split_two(char* text,char** first,char** second)
+{
+
+    char* separator = text;
+
+    while(*separator && *separator!=' ')
+    {
+
+        separator++;
+
+    }
+
+    if(*separator!=' ')
+    {
+
+        return 0;
+
+    }
+
+    *separator = 0;
+    *first = text;
+    *second = separator+1;
+
+    while(**second==' ')
+    {
+
+        (*second)++;
+
+    }
+
+    return **second!=0;
+
+}
+
+
+
+static void print_two_digits(unsigned int value)
+{
+
+    vga_put_char('0'+((value/10)%10));
+    vga_put_char('0'+(value%10));
+
+}
+
+
+
+static void shell_print_help()
+{
+
+    println("Commands:");
+    println("  help, clear, info, uptime, ticks");
+    println("  time, date, mem, alloc <bytes>");
+    println("  devs, disk, disk read <n>, disk write <n> <text>");
+    println("  ls, mkdir <dir>, touch <file>, cat/write/append/rm/mv");
+    println("  color <fg> <bg>, box, rect, theme");
+    println("  net, ip <addr>, route <gw>, arp, arp add <ip> <mac>");
+    println("  link <up|down>, ping <ip>, send <ip> <text>, rx <text>");
+    println("  echo <text>, reboot, halt");
+
+}
+
+
+
+static void shell_print_fsinfo()
+{
+
+    print("Files: ");
+    print_uint(ramfs_count()-ramfs_dir_count());
+    print(" dirs: ");
+    print_uint(ramfs_dir_count());
+    print("/");
+    print_uint(RAMFS_FILE_MAX);
+    print(" bytes used: ");
+    print_uint(ramfs_used_bytes());
+    print(" free: ");
+    print_uint(ramfs_free_bytes());
+    println("");
+
+}
+
+
+
+static void shell_list_files()
+{
+
+    unsigned int i;
+    RAMFS_NODE* node;
+
+
+    for(i=0;i<ramfs_count();i++)
+    {
+
+        node = ramfs_get(i);
+        if(node)
+        {
+
+            print(node->name);
+            print(node->directory ? "  <DIR>  " : "  <FILE> ");
+            print("  ");
+            print_uint(node->size);
+            println(" bytes");
+
+        }
+
+    }
+
+}
+
+
+
+static void shell_print_devices()
+{
+
+    unsigned int i;
+    DEVICE* dev;
+
+    for(i=0;i<device_count();i++)
+    {
+
+        dev = device_get(i);
+        if(dev)
+        {
+
+            print_uint(dev->id);
+            print("  ");
+            print(dev->name);
+            print("  ");
+            println(dev->type);
+
+        }
+
+    }
+
+}
+
+
+
+static void shell_print_disk()
+{
+
+    print("rd0 sectors=");
+    print_uint(ramdisk_sector_count());
+    print(" sector_size=");
+    print_uint(RAMDISK_SECTOR_SIZE);
+    print(" bytes total=");
+    print_uint(ramdisk_size_bytes());
+    println("");
+
+}
+
+
+
+static void shell_print_arp()
+{
+
+    unsigned int i;
+    ARP_ENTRY* entry;
+
+    for(i=0;i<net_arp_count();i++)
+    {
+
+        entry = net_get_arp(i);
+        if(entry)
+        {
+
+            net_print_ip(entry->ip);
+            print("  ");
+            println(entry->mac);
+
+        }
+
+    }
+
+}
+
+
+
+static void shell_print_net()
+{
+
+    NET_DEVICE* dev = net_get_device();
+
+    print(dev->name);
+    print(" link=");
+    println(dev->link_up ? "up" : "down");
+    print("ip=");
+    net_print_ip(dev->ip);
+    print(" gateway=");
+    net_print_ip(dev->gateway);
+    print(" dns=");
+    net_print_ip(dev->dns);
+    println("");
+    print("tx=");
+    print_uint(dev->tx_packets);
+    print(" rx=");
+    print_uint(dev->rx_packets);
+    print(" drop=");
+    print_uint(dev->dropped_packets);
+    println("");
+
+}
+
+
+
+static void shell_draw_theme()
+{
+
+    unsigned char old_color = vga_get_color();
+
+    vga_clear();
+    vga_draw_box(1,1,78,23,0x0A);
+    vga_draw_box(4,3,32,8,0x0B);
+    vga_draw_box(40,3,35,8,0x0E);
+    vga_fill_rect(5,13,70,5,' ',0x1F);
+    vga_set_color(15,0);
+    print("DavidyanOS graphics surface");
+    vga_put_at(6,5,'F',0x0B);
+    vga_put_at(8,5,'S',0x0B);
+    vga_put_at(42,5,'N',0x0E);
+    vga_put_at(44,5,'E',0x0E);
+    vga_put_at(46,5,'T',0x0E);
+    vga_set_color(old_color&0x0F,old_color>>4);
+
+}
+
+
+
+static void shell_print_time()
+{
+
+    RTC_TIME time;
+
+
+    rtc_read_time(&time);
+    print_two_digits(time.hour);
+    vga_put_char(':');
+    print_two_digits(time.minute);
+    vga_put_char(':');
+    print_two_digits(time.second);
+    println("");
+
+}
+
+
+
+static void shell_print_date()
+{
+
+    RTC_TIME time;
+
+
+    rtc_read_time(&time);
+    print_uint(time.year);
+    vga_put_char('-');
+    print_two_digits(time.month);
+    vga_put_char('-');
+    print_two_digits(time.day);
+    println("");
+
+}
+
+
+
 static void shell_execute(char* command)
 {
 
@@ -47,7 +361,7 @@ static void shell_execute(char* command)
     if(strcmp(command,"help")==0)
     {
 
-        println("Commands: help, clear, info, uptime, echo");
+        shell_print_help();
         return;
 
     }
@@ -84,10 +398,513 @@ static void shell_execute(char* command)
     }
 
 
+    if(strcmp(command,"ticks")==0)
+    {
+
+        print("Ticks: ");
+        print_uint(timer_get_ticks());
+        println("");
+        return;
+
+    }
+
+
+    if(strcmp(command,"time")==0)
+    {
+
+        shell_print_time();
+        return;
+
+    }
+
+
+    if(strcmp(command,"date")==0)
+    {
+
+        shell_print_date();
+        return;
+
+    }
+
+
+    if(strcmp(command,"mem")==0)
+    {
+
+        print("Heap start: ");
+        print_hex(heap_get_start());
+        print(" end: ");
+        print_hex(heap_get_end());
+        print(" used: ");
+        print_uint(heap_get_used());
+        print(" free: ");
+        print_uint(heap_get_free());
+        println(" bytes");
+        return;
+
+    }
+
+
+    if(strcmp(command,"devs")==0)
+    {
+
+        shell_print_devices();
+        return;
+
+    }
+
+
+    if(strcmp(command,"disk")==0)
+    {
+
+        shell_print_disk();
+        return;
+
+    }
+
+
+    if(strncmp(command,"disk read ",10)==0)
+    {
+
+        char sector[RAMDISK_SECTOR_SIZE];
+        unsigned int index = shell_parse_uint(command+10);
+        if(!ramdisk_read(index,sector))
+        {
+
+            println("Bad sector");
+            return;
+
+        }
+
+        println(sector);
+        return;
+
+    }
+
+
+    if(strncmp(command,"disk write ",11)==0)
+    {
+
+        unsigned int index = shell_parse_uint(command+11);
+        char* data = shell_skip_word(command+11);
+
+        if(data[0]==0 || !ramdisk_write(index,data))
+        {
+
+            println("Usage: disk write <sector> <text>");
+            return;
+
+        }
+
+        println("Sector written");
+        return;
+
+    }
+
+
+    if(strcmp(command,"fsinfo")==0)
+    {
+
+        shell_print_fsinfo();
+        return;
+
+    }
+
+
+    if(strcmp(command,"ls")==0)
+    {
+
+        shell_list_files();
+        return;
+
+    }
+
+
+    if(strncmp(command,"cat ",4)==0)
+    {
+
+        RAMFS_NODE* node = ramfs_find(command+4);
+        if(node==0)
+        {
+
+            println("File not found");
+            return;
+
+        }
+
+        if(node->directory)
+        {
+
+            println("Is a directory");
+            return;
+
+        }
+
+        println(node->data);
+        return;
+
+    }
+
+
+    if(strncmp(command,"mkdir ",6)==0)
+    {
+
+        println(ramfs_mkdir(command+6) ? "Directory created" : "mkdir failed");
+        return;
+
+    }
+
+
+    if(strncmp(command,"touch ",6)==0)
+    {
+
+        println(ramfs_touch(command+6) ? "File ready" : "touch failed");
+        return;
+
+    }
+
+
+    if(strncmp(command,"write ",6)==0)
+    {
+
+        char* name = command+6;
+        char* data = shell_skip_word(name);
+        if(data[0]==0)
+        {
+
+            println("Usage: write <file> <text>");
+            return;
+
+        }
+
+        *(data-1) = 0;
+
+        if(!ramfs_write(name,data))
+        {
+
+            println("Usage: write <file> <text>");
+            return;
+
+        }
+
+        println("File written");
+        return;
+
+    }
+
+
+    if(strncmp(command,"append ",7)==0)
+    {
+
+        char* name = command+7;
+        char* data = shell_skip_word(name);
+
+        if(data[0]==0)
+        {
+
+            println("Usage: append <file> <text>");
+            return;
+
+        }
+
+        *(data-1) = 0;
+
+        println(ramfs_append(name,data) ? "File appended" : "append failed");
+        return;
+
+    }
+
+
+    if(strncmp(command,"mv ",3)==0)
+    {
+
+        char* first;
+        char* second;
+
+        if(!shell_split_two(command+3,&first,&second) || !ramfs_rename(first,second))
+        {
+
+            println("Usage: mv <old> <new>");
+            return;
+
+        }
+
+        println("Renamed");
+        return;
+
+    }
+
+
+    if(strncmp(command,"rm ",3)==0)
+    {
+
+        println(ramfs_delete(command+3) ? "File deleted" : "File not found");
+        return;
+
+    }
+
+
+    if(strncmp(command,"color ",6)==0)
+    {
+
+        unsigned int fg = shell_parse_uint(command+6);
+        unsigned int bg = shell_parse_uint(shell_skip_word(command+6));
+        vga_set_color((unsigned char)fg,(unsigned char)bg);
+        println("Color changed");
+        return;
+
+    }
+
+
+    if(strcmp(command,"box")==0)
+    {
+
+        vga_draw_box(10,5,60,12,0x0B);
+        return;
+
+    }
+
+
+    if(strcmp(command,"rect")==0)
+    {
+
+        vga_fill_rect(18,8,44,7,' ',0x2F);
+        return;
+
+    }
+
+
+    if(strcmp(command,"theme")==0)
+    {
+
+        shell_draw_theme();
+        return;
+
+    }
+
+
+    if(strcmp(command,"net")==0)
+    {
+
+        shell_print_net();
+        return;
+
+    }
+
+
+    if(strncmp(command,"ip ",3)==0)
+    {
+
+        IPV4_ADDR ip;
+        if(!net_parse_ipv4(command+3,&ip))
+        {
+
+            println("Bad IPv4 address");
+            return;
+
+        }
+
+        net_set_ip(ip);
+        println("IP updated");
+        return;
+
+    }
+
+
+    if(strncmp(command,"route ",6)==0)
+    {
+
+        IPV4_ADDR ip;
+        if(!net_parse_ipv4(command+6,&ip))
+        {
+
+            println("Bad gateway address");
+            return;
+
+        }
+
+        net_set_gateway(ip);
+        println("Gateway updated");
+        return;
+
+    }
+
+
+    if(strcmp(command,"arp")==0)
+    {
+
+        shell_print_arp();
+        return;
+
+    }
+
+
+    if(strncmp(command,"arp add ",8)==0)
+    {
+
+        IPV4_ADDR ip;
+        char* first;
+        char* second;
+
+        if(!shell_split_two(command+8,&first,&second) || !net_parse_ipv4(first,&ip) || !net_arp_add(ip,second))
+        {
+
+            println("Usage: arp add <ip> <mac>");
+            return;
+
+        }
+
+        println("ARP entry saved");
+        return;
+
+    }
+
+
+    if(strcmp(command,"link up")==0)
+    {
+
+        net_set_link(1);
+        println("net0 link up");
+        return;
+
+    }
+
+
+    if(strcmp(command,"link down")==0)
+    {
+
+        net_set_link(0);
+        println("net0 link down");
+        return;
+
+    }
+
+
+    if(strncmp(command,"ping ",5)==0)
+    {
+
+        IPV4_ADDR ip;
+        if(!net_parse_ipv4(command+5,&ip))
+        {
+
+            println("Bad IPv4 address");
+            return;
+
+        }
+
+        if(!net_ping(ip))
+        {
+
+            println("Network is down");
+
+        }
+
+        return;
+
+    }
+
+
+    if(strncmp(command,"send ",5)==0)
+    {
+
+        IPV4_ADDR ip;
+        char* address = command+5;
+        char* payload = shell_skip_word(address);
+        char* separator = address;
+
+        while(*separator && *separator!=' ')
+        {
+
+            separator++;
+
+        }
+
+        if(*separator!=' ')
+        {
+
+            println("Usage: send <ip> <text>");
+            return;
+
+        }
+
+        *separator = 0;
+        if(!net_parse_ipv4(address,&ip))
+        {
+
+            println("Bad IPv4 address");
+            return;
+
+        }
+
+        if(!net_send(ip,payload))
+        {
+
+            println("Send failed");
+
+        }
+
+        return;
+
+    }
+
+
+    if(strncmp(command,"rx ",3)==0)
+    {
+
+        net_receive_demo(command+3);
+        return;
+
+    }
+
+
+    if(strncmp(command,"alloc ",6)==0)
+    {
+        unsigned int size = shell_parse_uint(command+6);
+        void* address = kmalloc(size);
+
+
+        if(address==0)
+        {
+
+            println("Allocation failed");
+            return;
+
+        }
+
+
+        print("Allocated ");
+        print_uint(size);
+        print(" bytes at ");
+        print_hex((unsigned int)address);
+        println("");
+        return;
+
+    }
+
+
     if(strncmp(command,"echo ",5)==0)
     {
 
         println(command+5);
+        return;
+
+    }
+
+
+    if(strcmp(command,"reboot")==0)
+    {
+
+        println("Rebooting...");
+        system_reboot();
+        return;
+
+    }
+
+
+    if(strcmp(command,"halt")==0)
+    {
+
+        println("System halted");
+        system_halt();
         return;
 
     }

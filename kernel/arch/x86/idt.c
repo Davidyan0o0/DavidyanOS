@@ -1,6 +1,6 @@
 #include "idt.h"
 
-
+// 中断描述符结构
 typedef struct
 {
 
@@ -15,11 +15,11 @@ typedef struct
     unsigned short offset_high;
 
 
-}__attribute__((packed))
+}__attribute__((packed)) // __attribute__((packed))禁止编译器自动填充结构体对齐字节
 IDT_ENTRY;
 
 
-
+// CPU加载IDT用
 typedef struct
 {
 
@@ -32,13 +32,15 @@ IDT_PTR;
 
 
 
-IDT_ENTRY idt[256];
+IDT_ENTRY idt[256]; // x86中中断号范围0~255
 
 
 IDT_PTR idtp;
 
 
+// 汇编函数
 
+// 硬件中断
 extern void irq0();
 extern void irq1();
 
@@ -76,19 +78,14 @@ extern void isr30();
 extern void isr31();
 
 
-
-void idt_set_gate(
-    int num,
-    unsigned int handler
-)
+// 设置一个中断入口
+void idt_set_gate(int num,unsigned int handler)
 {
 
-    idt[num].offset_low =
-        handler & 0xffff;
+    idt[num].offset_low = handler & 0xffff;
 
 
-    idt[num].selector =
-        0x08;
+    idt[num].selector = 0x08; // 发生中断后CPU跳到GDT第1个描述符
 
 
     idt[num].zero=0;
@@ -105,7 +102,7 @@ void idt_set_gate(
 
 
 
-
+// 加载IDT生成lidt地址 CPU执行后IDTR寄存器->保存IDT位置
 void idt_load()
 {
 
@@ -120,24 +117,19 @@ void idt_load()
 
 
 
-
+// 中断初始化
 void idt_init()
 {
 
     int i;
 
-
+    // 先全部设置为空,否则某个未知中断发生,CPU跳到随机地址直接Triple Fault -> 重启
     for(i=0;i<256;i++)
     {
-
-        idt_set_gate(
-            i,
-            0
-        );
-
+        idt_set_gate(i,0);
     }
 
-
+    // 注册CPU异常
     idt_set_gate(0,(unsigned int)isr0);
     idt_set_gate(1,(unsigned int)isr1);
     idt_set_gate(2,(unsigned int)isr2);
@@ -171,18 +163,16 @@ void idt_init()
     idt_set_gate(30,(unsigned int)isr30);
     idt_set_gate(31,(unsigned int)isr31);
 
-
+    // 注册硬件IRQ
     idt_set_gate(32,(unsigned int)irq0);
     idt_set_gate(33,(unsigned int)irq1);
 
 
 
-    idtp.limit =
-        sizeof(idt)-1;
+    idtp.limit = sizeof(idt)-1;
 
 
-    idtp.base =
-        (unsigned int)&idt;
+    idtp.base = (unsigned int)&idt;
 
 
     idt_load();

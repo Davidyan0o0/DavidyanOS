@@ -1,6 +1,6 @@
 #include "kernel/arch/x86/timer.h"
 
-#include "kernel/arch/x86/pic.h"
+#include "kernel/arch/x86/io.h"
 
 
 #define PIT_BASE_FREQUENCY 1193182

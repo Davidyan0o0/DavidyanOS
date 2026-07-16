@@ -7,7 +7,7 @@
 #define VGA_HEIGHT 25
 
 
-#define VGA_COLOR 0x0F
+#define VGA_DEFAULT_COLOR 0x0F
 
 
 
@@ -17,13 +17,21 @@ unsigned short* vga_buffer = (unsigned short*)VGA_MEMORY;
 
 int cursor_x = 0;
 int cursor_y = 0;
+static unsigned char vga_color = VGA_DEFAULT_COLOR;
 
 
 
 static unsigned short vga_entry(char c)
 {
 
-    return (VGA_COLOR<<8) | c;
+    return (vga_color<<8) | c;
+
+}
+
+static unsigned short vga_entry_color(char c,unsigned char color)
+{
+
+    return (color<<8) | c;
 
 }
 
@@ -276,6 +284,103 @@ void vga_write(char* str)
         vga_put_char(*str);
 
         str++;
+
+    }
+
+}
+
+
+
+void vga_set_color(unsigned char foreground,unsigned char background)
+{
+
+    vga_color = (background<<4) | (foreground&0x0F);
+
+}
+
+
+
+unsigned char vga_get_color()
+{
+
+    return vga_color;
+
+}
+
+
+
+void vga_put_at(int x,int y,char c,unsigned char color)
+{
+
+    if(x<0 || y<0 || x>=VGA_WIDTH || y>=VGA_HEIGHT)
+    {
+
+        return;
+
+    }
+
+
+    vga_buffer[y*VGA_WIDTH+x] = vga_entry_color(c,color);
+
+}
+
+
+
+void vga_fill_rect(int x,int y,int width,int height,char c,unsigned char color)
+{
+
+    int px;
+    int py;
+
+
+    for(py=y;py<y+height;py++)
+    {
+
+        for(px=x;px<x+width;px++)
+        {
+
+            vga_put_at(px,py,c,color);
+
+        }
+
+    }
+
+}
+
+
+
+void vga_draw_box(int x,int y,int width,int height,unsigned char color)
+{
+
+    int i;
+
+
+    if(width<2 || height<2)
+    {
+
+        return;
+
+    }
+
+
+    vga_put_at(x,y,'+',color);
+    vga_put_at(x+width-1,y,'+',color);
+    vga_put_at(x,y+height-1,'+',color);
+    vga_put_at(x+width-1,y+height-1,'+',color);
+
+    for(i=1;i<width-1;i++)
+    {
+
+        vga_put_at(x+i,y,'-',color);
+        vga_put_at(x+i,y+height-1,'-',color);
+
+    }
+
+    for(i=1;i<height-1;i++)
+    {
+
+        vga_put_at(x,y+i,'|',color);
+        vga_put_at(x+width-1,y+i,'|',color);
 
     }
 

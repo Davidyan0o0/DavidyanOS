@@ -10,5 +10,7 @@ void println(char* str);
 
 void print_uint(unsigned int value);
 
+void print_hex(unsigned int value);
+
 
 #endif

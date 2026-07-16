@@ -1,6 +1,7 @@
 #include "keyboard.h"
 
 #include "kernel/shell.h"
+#include "kernel/arch/x86/io.h"
 
 
 
@@ -112,27 +113,6 @@ unsigned char shift_keymap[128]=
 
 static int shift_pressed = 0;
 
-
-
-
-unsigned char inb(
-unsigned short port
-)
-{
-
-unsigned char ret;
-
-
-asm volatile(
-"inb %1,%0"
-:"=a"(ret)
-:"Nd"(port)
-);
-
-
-return ret;
-
-}
 
 
 
