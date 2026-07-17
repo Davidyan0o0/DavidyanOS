@@ -61,6 +61,39 @@ static unsigned char image_vga_color(IMAGE_PIXEL pixel)
     return color;
 }
 
+
+
+static unsigned char image_vga_palette_color(IMAGE_PIXEL pixel)
+{
+    unsigned char r = (unsigned char)(pixel.r/51);
+    unsigned char g = (unsigned char)(pixel.g/51);
+    unsigned char b = (unsigned char)(pixel.b/51);
+
+    return (unsigned char)(16 + r*36 + g*6 + b);
+}
+
+
+
+static void image_init_palette()
+{
+    unsigned int r;
+    unsigned int g;
+    unsigned int b;
+    unsigned char index;
+
+    for(r=0;r<6;r++)
+    {
+        for(g=0;g<6;g++)
+        {
+            for(b=0;b<6;b++)
+            {
+                index = (unsigned char)(16 + r*36 + g*6 + b);
+                vga_set_palette_color(index,(unsigned char)(r*51),(unsigned char)(g*51),(unsigned char)(b*51));
+            }
+        }
+    }
+}
+
 void image_init()
 {
 }
@@ -124,7 +157,7 @@ int image_load_file(char* name,IMAGE* image)
         return 0;
     }
 
-    return image_parse_ppm(node->data,image);
+    return image_parse_ppm(node->external ? node->external_data : node->data,image);
 }
 
 void image_make_demo(IMAGE* image)
@@ -189,4 +222,83 @@ void image_display(IMAGE* image,int x,int y,int scale)
             }
         }
     }
+}
+
+
+
+void image_display_graphics(IMAGE* image,int x,int y,int scale)
+{
+    unsigned int px;
+    unsigned int py;
+    unsigned int sx;
+    unsigned int sy;
+    unsigned int index;
+    unsigned char color;
+
+    if(scale<1)
+    {
+        scale = 1;
+    }
+
+    vga_set_graphics_mode();
+    image_init_palette();
+
+    for(py=0;py<image->height;py++)
+    {
+        for(px=0;px<image->width;px++)
+        {
+            index = py*image->width+px;
+            color = image_vga_palette_color(image->pixels[index]);
+
+            for(sy=0;sy<(unsigned int)scale;sy++)
+            {
+                for(sx=0;sx<(unsigned int)scale;sx++)
+                {
+                    vga_put_pixel(x+(int)(px*scale+sx),y+(int)(py*scale+sy),color);
+                }
+            }
+        }
+    }
+}
+
+
+
+void image_display_big_demo()
+{
+    unsigned int x;
+    unsigned int y;
+    IMAGE_PIXEL pixel;
+    unsigned char color;
+    unsigned int band;
+
+    vga_set_graphics_mode();
+    image_init_palette();
+
+    for(y=0;y<200;y++)
+    {
+        for(x=0;x<320;x++)
+        {
+            pixel.r = (unsigned char)((x*255)/319);
+            pixel.g = (unsigned char)((y*255)/199);
+            pixel.b = (unsigned char)(((x+y)*255)/518);
+
+            band = ((x/20) + (y/20)) & 1;
+            if(band)
+            {
+                pixel.r = (unsigned char)(255-pixel.r);
+                pixel.b = (unsigned char)(255-pixel.b);
+            }
+
+            color = image_vga_palette_color(pixel);
+            vga_put_pixel((int)x,(int)y,color);
+        }
+    }
+
+    vga_fill_graphics_rect(34,38,252,8,231);
+    vga_fill_graphics_rect(34,154,252,8,16);
+    vga_fill_graphics_rect(54,58,34,84,196);
+    vga_fill_graphics_rect(102,58,34,84,46);
+    vga_fill_graphics_rect(150,58,34,84,51);
+    vga_fill_graphics_rect(198,58,34,84,226);
+    vga_fill_graphics_rect(246,58,20,84,201);
 }

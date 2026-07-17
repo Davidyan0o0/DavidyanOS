@@ -1,8 +1,8 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
-#define IMAGE_MAX_WIDTH 32
-#define IMAGE_MAX_HEIGHT 16
+#define IMAGE_MAX_WIDTH 128
+#define IMAGE_MAX_HEIGHT 128
 #define IMAGE_MAX_PIXELS (IMAGE_MAX_WIDTH*IMAGE_MAX_HEIGHT)
 
 typedef struct
@@ -25,5 +25,7 @@ int image_load_file(char* name,IMAGE* image);
 void image_make_demo(IMAGE* image);
 void image_print_info(IMAGE* image);
 void image_display(IMAGE* image,int x,int y,int scale);
+void image_display_graphics(IMAGE* image,int x,int y,int scale);
+void image_display_big_demo();
 
 #endif

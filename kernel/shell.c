@@ -182,6 +182,51 @@ static int shell_split_two(char* text,char** first,char** second)
 
 
 
+static int shell_split_optional_uint(char* text,char** first,unsigned int* value)
+{
+
+    char* separator = text;
+
+    while(*separator && *separator!=' ')
+    {
+
+        separator++;
+
+    }
+
+    *first = text;
+    *value = 1;
+
+    if(*separator==0)
+    {
+
+        return text[0]!=0;
+
+    }
+
+    *separator = 0;
+    separator++;
+
+    while(*separator==' ')
+    {
+
+        separator++;
+
+    }
+
+    if(*separator!=0)
+    {
+
+        *value = shell_parse_uint(separator);
+
+    }
+
+    return text[0]!=0;
+
+}
+
+
+
 static void print_two_digits(unsigned int value)
 {
 
@@ -203,7 +248,7 @@ static void shell_print_help()
     println("  dfs open/view/edit/append/save/status for disk files");
     println("  ls, mkdir <dir>, touch <file>, cat/write/append/rm/mv");
     println("  color <fg> <bg>, box, rect, theme");
-    println("  img <file> [scale], imginfo <file>, demoimg");
+    println("  img <file> [scale], gimg <file> [scale], bigimg, text, imginfo <file>, demoimg");
     println("  net, ip <addr>, route <gw>, arp, arp add <ip> <mac>");
     println("  dns <name>, dhcp, sockets, listen/close <port>");
     println("  link <up|down>, ping <ip>, send <ip> <text>, rx <text>");
@@ -1007,7 +1052,7 @@ static void shell_execute(char* command)
 
         }
 
-        println(node->data);
+        println(node->external ? node->external_data : node->data);
         return;
 
     }
@@ -1169,15 +1214,14 @@ static void shell_execute(char* command)
     if(strncmp(command,"img ",4)==0)
     {
 
-        IMAGE image;
-        char* file = command+4;
-        char* scale_text = shell_skip_word(file);
-        int scale = 1;
+        static IMAGE image;
+        char* file;
+        unsigned int scale;
 
-        if(scale_text[0]!=0)
+        if(!shell_split_optional_uint(command+4,&file,&scale))
         {
-            *(scale_text-1) = 0;
-            scale = (int)shell_parse_uint(scale_text);
+            println("Usage: img <file> [scale]");
+            return;
         }
 
         if(!image_load_file(file,&image))
@@ -1187,7 +1231,50 @@ static void shell_execute(char* command)
         }
 
         vga_clear();
-        image_display(&image,2,2,scale);
+        image_display(&image,2,2,(int)scale);
+        return;
+
+    }
+
+
+    if(strncmp(command,"gimg ",5)==0)
+    {
+
+        static IMAGE image;
+        char* file;
+        unsigned int scale;
+
+        if(!shell_split_optional_uint(command+5,&file,&scale))
+        {
+            println("Usage: gimg <file> [scale]");
+            return;
+        }
+
+        if(!image_load_file(file,&image))
+        {
+            println("Image load failed (use P3 PPM)");
+            return;
+        }
+
+        image_display_graphics(&image,0,0,(int)scale);
+        return;
+
+    }
+
+
+    if(strcmp(command,"bigimg")==0)
+    {
+
+        image_display_big_demo();
+        return;
+
+    }
+
+
+    if(strcmp(command,"text")==0)
+    {
+
+        vga_set_text_mode();
         return;
 
     }
@@ -1196,7 +1283,7 @@ static void shell_execute(char* command)
     if(strcmp(command,"demoimg")==0)
     {
 
-        IMAGE image;
+        static IMAGE image;
         image_make_demo(&image);
         vga_clear();
         image_display(&image,2,2,2);
@@ -1578,6 +1665,19 @@ void shell_init()
 
 void shell_handle_key(char c)
 {
+
+    if(vga_is_graphics_mode())
+    {
+        if(c==27)
+        {
+            vga_set_text_mode();
+            shell_reset_input();
+            shell_prompt();
+        }
+
+        return;
+    }
+
 
     if(c=='\n')
     {

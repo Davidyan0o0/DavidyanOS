@@ -55,6 +55,17 @@ if errorlevel 1 goto error
 
 
 echo.
+echo [3-0] Embed ramfs assets
+
+
+py -3 scripts/embed_text_asset.py scripts/Davidyan.ppm kernel/fs/ramfs_assets.h ramfs_davidyan_ppm davidyan.ppm
+
+if errorlevel 1 python scripts/embed_text_asset.py scripts/Davidyan.ppm kernel/fs/ramfs_assets.h ramfs_davidyan_ppm davidyan.ppm
+
+if errorlevel 1 goto error
+
+
+echo.
 echo [3-1] Build kernel entry
 
 

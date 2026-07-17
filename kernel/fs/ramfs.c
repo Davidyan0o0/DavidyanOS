@@ -1,6 +1,7 @@
 #include "kernel/fs/ramfs.h"
 
 #include "kernel/lib/string.h"
+#include "kernel/fs/ramfs_assets.h"
 
 static RAMFS_NODE nodes[RAMFS_FILE_MAX];
 static unsigned int mounted = 0;
@@ -50,6 +51,18 @@ static unsigned int ramfs_append_data(RAMFS_NODE* node,char* src)
     return i;
 }
 
+static unsigned int ramfs_text_size(char* text)
+{
+    unsigned int size = 0;
+
+    while(text[size])
+    {
+        size++;
+    }
+
+    return size;
+}
+
 void ramfs_init()
 {
     unsigned int i;
@@ -62,11 +75,12 @@ void ramfs_init()
     mounted = 1;
     ramfs_mkdir("/cfg");
     ramfs_mkdir("/log");
-    ramfs_create("readme.txt","DavidyanOS ramfs is ready. Use ls, cat, write and rm.");
+    ramfs_create("readme.txt","DavidyanOS");
     ramfs_create("net.cfg","ip=10.0.2.15 gateway=10.0.2.2 dns=10.0.2.3");
     ramfs_create("notes.txt","This filesystem lives in kernel memory.");
     ramfs_create("/log/boot.log","console vga pic idt timer heap fs net ready");
     ramfs_create("logo.ppm","P3 2 2 255 255 0 0 0 255 0 0 0 255 255 255 255 255");
+    ramfs_create_external(ramfs_davidyan_ppm_name,ramfs_davidyan_ppm_data,ramfs_davidyan_ppm_size);
 }
 
 RAMFS_NODE* ramfs_find(char* name)
@@ -104,8 +118,42 @@ int ramfs_create(char* name,char* data)
         {
             nodes[i].used = 1;
             nodes[i].directory = 0;
+            nodes[i].external = 0;
+            nodes[i].external_data = 0;
             ramfs_copy_name(nodes[i].name,name);
             nodes[i].size = ramfs_copy_data(nodes[i].data,data);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int ramfs_create_external(char* name,char* data,unsigned int size)
+{
+    unsigned int i;
+
+    if(!mounted || name[0]==0 || data==0 || ramfs_find(name)!=0)
+    {
+        return 0;
+    }
+
+    if(size==0)
+    {
+        size = ramfs_text_size(data);
+    }
+
+    for(i=0;i<RAMFS_FILE_MAX;i++)
+    {
+        if(!nodes[i].used)
+        {
+            nodes[i].used = 1;
+            nodes[i].directory = 0;
+            nodes[i].external = 1;
+            nodes[i].external_data = data;
+            nodes[i].size = size;
+            nodes[i].data[0] = 0;
+            ramfs_copy_name(nodes[i].name,name);
             return 1;
         }
     }
@@ -128,6 +176,8 @@ int ramfs_mkdir(char* name)
         {
             nodes[i].used = 1;
             nodes[i].directory = 1;
+            nodes[i].external = 0;
+            nodes[i].external_data = 0;
             nodes[i].size = 0;
             ramfs_copy_name(nodes[i].name,name);
             nodes[i].data[0] = 0;
@@ -164,6 +214,8 @@ int ramfs_write(char* name,char* data)
         return 0;
     }
 
+    node->external = 0;
+    node->external_data = 0;
     node->size = ramfs_copy_data(node->data,data);
     return 1;
 }
@@ -182,6 +234,14 @@ int ramfs_append(char* name,char* data)
         return 0;
     }
 
+    if(node->external)
+    {
+        node->external = 0;
+        node->external_data = 0;
+        node->size = 0;
+        node->data[0] = 0;
+    }
+
     ramfs_append_data(node,data);
     return 1;
 }
@@ -198,7 +258,7 @@ int ramfs_read(char* name,char* out,unsigned int capacity)
 
     for(i=0;i<node->size && i<capacity-1;i++)
     {
-        out[i] = node->data[i];
+        out[i] = node->external ? node->external_data[i] : node->data[i];
     }
 
     out[i] = 0;

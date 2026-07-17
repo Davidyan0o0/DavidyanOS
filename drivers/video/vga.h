@@ -6,6 +6,20 @@ void vga_init();
 
 void vga_clear();
 
+void vga_set_text_mode();
+
+void vga_set_graphics_mode();
+
+int vga_is_graphics_mode();
+
+void vga_clear_graphics(unsigned char color);
+
+void vga_put_pixel(int x,int y,unsigned char color);
+
+void vga_fill_graphics_rect(int x,int y,int width,int height,unsigned char color);
+
+void vga_set_palette_color(unsigned char index,unsigned char r,unsigned char g,unsigned char b);
+
 void vga_put_char(char c);
 
 void vga_backspace();

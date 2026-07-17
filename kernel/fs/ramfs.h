@@ -11,11 +11,14 @@ typedef struct
     unsigned int size;
     unsigned int used;
     unsigned int directory;
+    unsigned int external;
+    char* external_data;
     char data[RAMFS_DATA_MAX];
 } RAMFS_NODE;
 
 void ramfs_init();
 int ramfs_create(char* name,char* data);
+int ramfs_create_external(char* name,char* data,unsigned int size);
 int ramfs_mkdir(char* name);
 int ramfs_touch(char* name);
 int ramfs_write(char* name,char* data);

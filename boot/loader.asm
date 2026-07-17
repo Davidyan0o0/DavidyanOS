@@ -23,13 +23,41 @@ start:
     mov dl,[BOOT_DRIVE]
     int 0x13
 
-    ; 加载Kernel
+    ; 分块加载Kernel，避免BIOS单次读扇区数限制
+    mov word [KERNEL_REMAINING],512
+
+load_kernel:
+    mov ax,[KERNEL_REMAINING]
+    cmp ax,0
+    je kernel_loaded
+
+    cmp ax,64
+    jbe .use_remaining
+    mov ax,64
+
+.use_remaining:
+    mov [KERNEL_DAP_COUNT],ax
+
     mov si,KERNEL_DAP
     mov ah,0x42
     mov dl,[BOOT_DRIVE]
     int 0x13
 
     jc disk_error
+
+    mov ax,[KERNEL_DAP_COUNT]
+    sub [KERNEL_REMAINING],ax
+
+    mov bx,ax
+    shl bx,5
+    add [KERNEL_DAP_SEGMENT],bx
+
+    add [KERNEL_DAP_LBA],ax
+    adc word [KERNEL_DAP_LBA+2],0
+
+    jmp load_kernel
+
+kernel_loaded:
 
     ; 打印
     mov si,msg
@@ -65,10 +93,17 @@ BOOT_DRIVE:
 KERNEL_DAP:
     db 0x10
     db 0x00
-    dw 96          ; kernel最大读取96扇区
+KERNEL_DAP_COUNT:
+    dw 64          ; 每次最多读取64扇区
+KERNEL_DAP_OFFSET:
     dw 0x0000
+KERNEL_DAP_SEGMENT:
     dw 0x1000
+KERNEL_DAP_LBA:
     dq 5           ; kernel从磁盘第5个LBA扇区开始
+
+KERNEL_REMAINING:
+    dw 0
 
 disk_error:
     mov si,error
