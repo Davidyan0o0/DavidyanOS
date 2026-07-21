@@ -4,6 +4,8 @@
 #include "kernel/fs/ramfs.h"
 #include "drivers/video/vga.h"
 
+static unsigned int last_error = IMAGE_ERROR_NONE;
+
 static unsigned int image_read_uint(char** text,unsigned int* value)
 {
     unsigned int number = 0;
@@ -112,17 +114,20 @@ int image_parse_ppm(char* text,IMAGE* image)
 
     if(text[0]!='P' || text[1]!='3')
     {
+        last_error = IMAGE_ERROR_BAD_MAGIC;
         return 0;
     }
 
     text += 2;
     if(!image_read_uint(&text,&width) || !image_read_uint(&text,&height) || !image_read_uint(&text,&max_value))
     {
+        last_error = IMAGE_ERROR_BAD_HEADER;
         return 0;
     }
 
     if(width==0 || height==0 || width>IMAGE_MAX_WIDTH || height>IMAGE_MAX_HEIGHT || max_value==0)
     {
+        last_error = IMAGE_ERROR_TOO_LARGE;
         return 0;
     }
 
@@ -135,6 +140,7 @@ int image_parse_ppm(char* text,IMAGE* image)
         {
             if(!image_read_uint(&text,&r) || !image_read_uint(&text,&g) || !image_read_uint(&text,&b))
             {
+                last_error = IMAGE_ERROR_BAD_PIXEL_DATA;
                 return 0;
             }
 
@@ -145,6 +151,7 @@ int image_parse_ppm(char* text,IMAGE* image)
         }
     }
 
+    last_error = IMAGE_ERROR_NONE;
     return 1;
 }
 
@@ -154,10 +161,16 @@ int image_load_file(char* name,IMAGE* image)
 
     if(node==0 || node->directory)
     {
+        last_error = IMAGE_ERROR_NOT_FOUND;
         return 0;
     }
 
     return image_parse_ppm(node->external ? node->external_data : node->data,image);
+}
+
+unsigned int image_last_error()
+{
+    return last_error;
 }
 
 void image_make_demo(IMAGE* image)

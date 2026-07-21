@@ -4,6 +4,8 @@
 
 void system_reboot();
 
+void system_shutdown();
+
 void system_halt();
 
 

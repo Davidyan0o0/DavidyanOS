@@ -12,10 +12,11 @@ void system_print_info()
     println("IRQ: timer IRQ0, keyboard IRQ1");
     println("Timer: PIT 100Hz");
     println("RTC: CMOS date/time reader");
-    println("Power: reboot and halt commands");
+    println("Power: reboot, shutdown, and halt commands");
     println("FS: ramfs with ls, cat, write, rm, fsinfo");
     println("Block: rd0 RAM disk, 32 sectors, 512 bytes each");
     println("Disk: ATA PIO hd0 with persistent diskfs at LBA 256");
+    println("USB: PCI USB controller scan and mass-storage diagnostics");
     println("Devices: kernel device registry with devs command");
     println("Video: VGA color, boxes, rect drawing");
     println("Images: PPM P3 parser with text-mode color rendering");

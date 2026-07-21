@@ -352,6 +352,41 @@ if errorlevel 1 goto error
 
 
 echo.
+echo [5-14a] Compile pci.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c drivers/bus/pci.c ^
+-o out/pci.o
+
+
+if errorlevel 1 goto error
+
+
+echo.
+echo [5-14b] Compile usb_storage.c
+
+
+%CC% ^
+-m32 ^
+-ffreestanding ^
+-fno-pie ^
+-fno-stack-protector ^
+-I. ^
+-c drivers/usb/usb_storage.c ^
+-o out/usb_storage.o
+
+
+if errorlevel 1 goto error
+
+
+
+echo.
 echo [5-15] Compile image.c
 
 
@@ -503,6 +538,8 @@ out/shell.o ^
 out/ata.o ^
 out/diskfs.o ^
 out/ne2k.o ^
+out/pci.o ^
+out/usb_storage.o ^
 out/image.o ^
 out/device.o ^
 out/ramdisk.o ^

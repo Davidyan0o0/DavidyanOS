@@ -33,6 +33,27 @@ void system_reboot()
 
 
 
+void system_shutdown()
+{
+
+    asm volatile("cli");
+
+
+    outw(0x604,0x2000);
+    outw(0xB004,0x2000);
+    outw(0x4004,0x3400);
+
+
+    while(1)
+    {
+
+        asm volatile("hlt");
+
+    }
+}
+
+
+
 void system_halt()
 {
 

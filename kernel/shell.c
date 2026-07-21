@@ -16,6 +16,8 @@
 #include "drivers/storage/ata.h"
 #include "kernel/fs/diskfs.h"
 #include "drivers/net/ne2k.h"
+#include "drivers/bus/pci.h"
+#include "drivers/usb/usb_storage.h"
 
 
 #define SHELL_INPUT_MAX 128
@@ -244,17 +246,18 @@ static void shell_print_help()
     println("  help, clear, info, uptime, ticks");
     println("  time, date, mem, alloc <bytes>");
     println("  devs, disk, disk read <n>, disk write <n> <text>");
-    println("  ata, dfs, dfs write/cat/rm/format <file>");
+    println("  pci, usb, ata, dfs, dfs write/cat/rm/format <file>");
     println("  dfs open/view/edit/append/save/status for disk files");
     println("  ls, mkdir <dir>, touch <file>, cat/write/append/rm/mv");
     println("  color <fg> <bg>, box, rect, theme");
-    println("  img <file> [scale], gimg <file> [scale], bigimg, text, imginfo <file>, demoimg");
+    println("  img <file> [scale], gimg <file> [scale], imgdebug <file>");
+    println("  bigimg, text, imginfo <file>, demoimg");
     println("  net, ip <addr>, route <gw>, arp, arp add <ip> <mac>");
     println("  dns <name>, dhcp, sockets, listen/close <port>");
     println("  link <up|down>, ping <ip>, send <ip> <text>, rx <text>");
     println("  netsend <text> sends a real NE2000 ethernet frame");
     println("  arpreq <ip>, udp <ip> <port> <text>");
-    println("  echo <text>, reboot, halt");
+    println("  echo <text>, reboot, shutdown, halt");
 
 }
 
@@ -425,6 +428,72 @@ static void shell_print_diskfs_error()
     print_hex(ata_last_status());
     println("");
 
+}
+
+
+
+static void shell_print_image_error()
+{
+    unsigned int error = image_last_error();
+
+    if(error==IMAGE_ERROR_NOT_FOUND)
+    {
+        println("Image load failed: file not found");
+    }
+    else if(error==IMAGE_ERROR_BAD_MAGIC)
+    {
+        println("Image load failed: not P3 PPM");
+    }
+    else if(error==IMAGE_ERROR_BAD_HEADER)
+    {
+        println("Image load failed: bad PPM header");
+    }
+    else if(error==IMAGE_ERROR_TOO_LARGE)
+    {
+        print("Image load failed: max ");
+        print_uint(IMAGE_MAX_WIDTH);
+        print("x");
+        print_uint(IMAGE_MAX_HEIGHT);
+        println("");
+    }
+    else if(error==IMAGE_ERROR_BAD_PIXEL_DATA)
+    {
+        println("Image load failed: incomplete PPM pixels");
+    }
+    else
+    {
+        println("Image load failed");
+    }
+}
+
+
+
+static void shell_print_image_debug(char* name)
+{
+    RAMFS_NODE* node = ramfs_find(name);
+    char* data;
+    unsigned int i;
+
+    if(node==0 || node->directory)
+    {
+        println("imgdebug: file not found");
+        return;
+    }
+
+    data = node->external ? node->external_data : node->data;
+    print("name=");
+    print(node->name);
+    print(" size=");
+    print_uint(node->size);
+    print(" external=");
+    println(node->external ? "yes" : "no");
+
+    print("head=");
+    for(i=0;i<48 && i<node->size && data[i];i++)
+    {
+        vga_put_char(data[i]);
+    }
+    println("");
 }
 
 
@@ -828,6 +897,24 @@ static void shell_execute(char* command)
     }
 
 
+    if(strcmp(command,"pci")==0)
+    {
+
+        pci_print_devices();
+        return;
+
+    }
+
+
+    if(strcmp(command,"usb")==0)
+    {
+
+        usb_storage_print_status();
+        return;
+
+    }
+
+
     if(strcmp(command,"ata")==0)
     {
 
@@ -1201,11 +1288,20 @@ static void shell_execute(char* command)
         IMAGE image;
         if(!image_load_file(command+8,&image))
         {
-            println("Image load failed (use P3 PPM)");
+            shell_print_image_error();
             return;
         }
 
         image_print_info(&image);
+        return;
+
+    }
+
+
+    if(strncmp(command,"imgdebug ",9)==0)
+    {
+
+        shell_print_image_debug(command+9);
         return;
 
     }
@@ -1226,7 +1322,7 @@ static void shell_execute(char* command)
 
         if(!image_load_file(file,&image))
         {
-            println("Image load failed (use P3 PPM)");
+            shell_print_image_error();
             return;
         }
 
@@ -1252,7 +1348,7 @@ static void shell_execute(char* command)
 
         if(!image_load_file(file,&image))
         {
-            println("Image load failed (use P3 PPM)");
+            shell_print_image_error();
             return;
         }
 
@@ -1631,6 +1727,16 @@ static void shell_execute(char* command)
 
         println("Rebooting...");
         system_reboot();
+        return;
+
+    }
+
+
+    if(strcmp(command,"shutdown")==0)
+    {
+
+        println("Shutting down...");
+        system_shutdown();
         return;
 
     }
