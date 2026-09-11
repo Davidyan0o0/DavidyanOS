@@ -15,6 +15,8 @@ PROJECT = ROOT / "电路项目.CircuitProject"
 NS = "http://LogicCircuit.net/2.0.0.14/CircuitProject.xsd"
 CPU_ID = "88888888-8888-4888-8888-888888888888"
 CPU_NAME = "MINI8 CPU"
+PANEL_ID = "99999999-9999-4999-8999-999999999999"
+PANEL_NAME = "MINI8学习测试电路"
 LED = "00000000-0000-0000-0000-000000080100"
 
 # Persistent GateType, InputCount, Inverted tuples encoded by GateSet.GateGuid.
@@ -73,20 +75,26 @@ def valid_builtin_gate(value):
 
 
 class Builder:
-    def __init__(self):
+    def __init__(self, logical_id=CPU_ID, id_prefix=""):
+        self.logical_id = logical_id
+        self.id_prefix = id_prefix
         self.definitions = []
         self.pins = []
         self.symbols = []
         self.wires = []
+        self.notes = []
         self.symbol_count = 0
         self.wire_count = 0
+
+    def id(self, name):
+        return gid(self.id_prefix + name)
 
     def definition(self, tag, **attrs):
         self.definitions.append(line(tag, **attrs))
 
     def pin(self, name, bit_width=1, output=False, index=0):
-        pin_id = gid("pin:" + name)
-        attrs = {"PinId": pin_id, "CircuitId": CPU_ID}
+        pin_id = self.id("pin:" + name)
+        attrs = {"PinId": pin_id, "CircuitId": self.logical_id}
         if bit_width != 1:
             attrs["BitWidth"] = bit_width
         if output:
@@ -100,11 +108,11 @@ class Builder:
         return pin_id
 
     def symbol(self, circuit_id, x, y, name, rotation=None):
-        symbol_id = gid(f"symbol:{name}")
+        symbol_id = self.id(f"symbol:{name}")
         attrs = {
             "CircuitSymbolId": symbol_id,
             "CircuitId": circuit_id,
-            "LogicalCircuitId": CPU_ID,
+            "LogicalCircuitId": self.logical_id,
             "X": x,
             "Y": y,
         }
@@ -116,12 +124,19 @@ class Builder:
 
     def wire(self, p1, p2, name):
         attrs = {
-            "WireId": gid(f"wire:{name}:{self.wire_count}"),
-            "LogicalCircuitId": CPU_ID,
+            "WireId": self.id(f"wire:{name}:{self.wire_count}"),
+            "LogicalCircuitId": self.logical_id,
             "X1": p1[0], "Y1": p1[1], "X2": p2[0], "Y2": p2[1],
         }
         self.wires.append(line("Wire", **attrs))
         self.wire_count += 1
+
+    def note(self, x, y, width, height, name, content):
+        self.notes.append(line(
+            "TextNote", TextNoteId=self.id("note:" + name),
+            LogicalCircuitId=self.logical_id, X=x, Y=y, Width=width,
+            Height=height, Note=content,
+        ))
 
 
 def control_rom():
@@ -383,6 +398,81 @@ def build():
     return b
 
 
+def build_panel():
+    b = Builder(PANEL_ID, "panel:")
+    clock_id = b.id("button:clock")
+    reset_id = b.id("button:reset")
+    splitter_ids = {name: b.id("splitter:" + name) for name in (
+        "a", "pc", "ir", "bus", "mem_f", "step",
+    )}
+
+    b.definition(
+        "LogicalCircuit", LogicalCircuitId=PANEL_ID, Name=PANEL_NAME,
+        Notation="MINI8 TEST", Note="Manual clock learning panel for the MINI8 CPU",
+    )
+    b.definition("CircuitButton", CircuitButtonId=clock_id, Notation="CLK", Width=5)
+    b.definition(
+        "CircuitButton", CircuitButtonId=reset_id, Notation="RESET",
+        IsToggle="True", Width=5,
+    )
+    for name in ("a", "pc", "ir", "bus", "mem_f"):
+        b.definition(
+            "Splitter", SplitterId=splitter_ids[name], BitWidth=8,
+            PinCount=8, Clockwise="True",
+        )
+    b.definition(
+        "Splitter", SplitterId=splitter_ids["step"], BitWidth=2,
+        PinCount=2, Clockwise="True",
+    )
+
+    b.symbol(clock_id, 8, 13, "clock")
+    b.symbol(reset_id, 8, 17, "reset")
+    b.symbol(CPU_ID, 30, 13, "cpu")
+
+    # MINI8 has two inputs on the left and ten outputs on the right.
+    b.wire((13, 14), (30, 14), "clock")
+    b.wire((13, 18), (30, 15), "reset")
+
+    columns = {
+        "a": (48, 14),
+        "pc": (64, 16),
+        "ir": (80, 18),
+        "bus": (96, 19),
+        "mem_f": (112, 15),
+    }
+    for name, (x, cpu_y) in columns.items():
+        b.symbol(splitter_ids[name], x, 30, "splitter-" + name)
+        b.wire((33, cpu_y), (x, 34), name + "-wide")
+        for bit in range(8):
+            b.symbol(LED, x + 5, 30 + bit, "%s-led-%d" % (name, bit))
+            b.wire((x + 1, 31 + bit), (x + 5, 31 + bit), "%s-bit-%d" % (name, bit))
+
+    b.symbol(splitter_ids["step"], 48, 22, "splitter-step")
+    b.wire((33, 20), (48, 23), "step-wide")
+    for bit in range(2):
+        b.symbol(LED, 53, 22 + bit, "step-led-%d" % bit)
+        b.wire((49, 23 + bit), (53, 23 + bit), "step-bit-%d" % bit)
+    b.symbol(LED, 64, 20, "zero-led")
+    b.symbol(LED, 76, 21, "halt-led")
+    b.wire((33, 21), (64, 21), "zero")
+    b.wire((33, 22), (76, 22), "halt")
+
+    note = (
+        "&lt;FlowDocument PagePadding=&quot;5,0,5,0&quot; "
+        "xmlns=&quot;http://schemas.microsoft.com/winfx/2006/xaml/presentation&quot;&gt;"
+        "&lt;Paragraph&gt;&lt;Run FontWeight=&quot;Bold&quot; FontSize=&quot;16&quot;&gt;"
+        "MINI8 八位 CPU 单步学习面板&lt;/Run&gt;&lt;/Paragraph&gt;"
+        "&lt;Paragraph&gt;先打开 RESET，再点击 CLK，随后关闭 RESET。每次点击 CLK "
+        "执行一个微步骤；STEP 依次为 0、1、2、3。下方五列 LED 从左到右显示 "
+        "A、PC、IR、BUS、MEM_F，位序从上到下为 bit0..bit7；ZERO 和 HALT "
+        "显示状态标志。内置程序为 LDI 3、ADD E、STA F、HLT，最终 A=5、"
+        "MEM_F=5、HALT=1。可双击 MINI8 模块进入内部观察控制线。"
+        "&lt;/Paragraph&gt;&lt;/FlowDocument&gt;"
+    )
+    b.note(4, 3, 124, 7, "instructions", note)
+    return b
+
+
 def validate_xml(text):
     root = ET.fromstring(text)
     q = lambda name: f"{{{NS}}}{name}"
@@ -429,28 +519,50 @@ def main():
     original = PROJECT.read_text(encoding="utf-8-sig")
     root = ET.fromstring(original)
     q = f"{{{NS}}}LogicalCircuit"
-    exists = any(e.attrib.get("LogicalCircuitId") == CPU_ID or e.attrib.get("Name") == CPU_NAME
-                 for e in root.findall(q))
+    circuits = root.findall(q)
+    cpu_exists = any(
+        e.attrib.get("LogicalCircuitId") == CPU_ID or e.attrib.get("Name") == CPU_NAME
+        for e in circuits
+    )
+    panel_exists = any(
+        e.attrib.get("LogicalCircuitId") == PANEL_ID or e.attrib.get("Name") == PANEL_NAME
+        for e in circuits
+    )
     rebuild = len(sys.argv) == 2 and sys.argv[1] == "--rebuild"
-    if exists and not rebuild:
-        print("MINI8 CPU already exists; no changes made")
+    if cpu_exists and panel_exists and not rebuild:
+        print("MINI8 CPU and learning panel already exist; no changes made")
         return 0
-    b = build()
-    if exists:
+    builders = []
+    if rebuild or not cpu_exists:
+        builders.append(build())
+    if rebuild or not panel_exists:
+        builders.append(build_panel())
+    if rebuild:
         generated_ids = {gid("memory:ram"), gid("memory:control"), gid("constant:zero"),
-                         gid("constant:one"), gid("constant:fifteen")}
+                          gid("constant:one"), gid("constant:fifteen")}
         generated_ids.update(gid("splitter:" + name) for name in (
             "ram_out", "ram_addr", "ram_in", "control_addr", "control_out",
             "a_out", "pc_out", "mar_out", "ir_out", "bus_out", "step_out",
         ))
+        generated_ids.update(gid("panel:button:" + name) for name in ("clock", "reset"))
+        generated_ids.update(gid("panel:splitter:" + name) for name in (
+            "a", "pc", "ir", "bus", "mem_f", "step",
+        ))
         original = "".join(
             item for item in original.splitlines(keepends=True)
-            if CPU_ID not in item and not any(value in item for value in generated_ids)
+            if CPU_ID not in item and PANEL_ID not in item
+            and not any(value in item for value in generated_ids)
         )
-    generated = insert_before(original, "\t<Pin ", b.definitions[:1])
-    generated = insert_before(generated, "\t<Constant ", b.pins)
-    generated = insert_before(generated, "\t<CircuitSymbol ", b.definitions[1:] + b.symbols)
-    generated = insert_before(generated, "\t<Wire ", b.wires)
+    logical_circuits = [b.definitions[0] for b in builders]
+    pins = [item for b in builders for item in b.pins]
+    components = [item for b in builders for item in b.definitions[1:] + b.symbols]
+    wires = [item for b in builders for item in b.wires]
+    notes = [item for b in builders for item in b.notes]
+    generated = insert_before(original, "\t<Pin ", logical_circuits)
+    generated = insert_before(generated, "\t<Constant ", pins)
+    generated = insert_before(generated, "\t<CircuitSymbol ", components)
+    generated = insert_before(generated, "\t<Wire ", wires)
+    generated = insert_before(generated, "\t<TextNote ", notes)
     validate_xml(generated)
 
     fd, temp_name = tempfile.mkstemp(prefix=PROJECT.name + ".", suffix=".tmp", dir=PROJECT.parent)
@@ -463,7 +575,14 @@ def main():
     finally:
         if os.path.exists(temp_name):
             os.unlink(temp_name)
-    print(f"Added {CPU_NAME}: {b.symbol_count} symbols, {b.wire_count} wires")
+    summary = ", ".join(
+        "%s: %d symbols, %d wires" % (
+            CPU_NAME if b.logical_id == CPU_ID else PANEL_NAME,
+            b.symbol_count, b.wire_count,
+        )
+        for b in builders
+    )
+    print("Added " + summary)
     return 0
 
 
